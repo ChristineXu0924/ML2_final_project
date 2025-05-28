@@ -10,13 +10,13 @@ import yaml
 import torch
 import soundfile as sf
 import librosa
-from src.translate import translate_to_chinese
+# from src.translate import translate_to_chinese
 
 
 # Load configuration
 @st.cache_resource
 def load_config():
-    config_path = Path(__file__).parent / "config.yaml"
+    config_path = Path(__file__).parent.parent / "config" / "project_config.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file {config_path} not found.")
     with open(config_path, 'r') as file:
@@ -39,7 +39,7 @@ def load_models():
             "model": model,
             "device": device
         },
-        "ner": spacy.load(config["ner_model"]),
+        "ner": spacy.load(config["models"]["ner_model"]),
         "tiny_sum": pipeline("summarization", model=config["models"]["summarization"]["tiny"]),
         "long_sum": pipeline("summarization", model=config["models"]["summarization"]["large"]),  
         "short_sum": pipeline("summarization", model=config["models"]["summarization"]["small"])

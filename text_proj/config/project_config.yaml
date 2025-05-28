@@ -3,10 +3,9 @@ data:
   processed_data_path: "../data/wave2vec_transcribed.csv"
 
 models:
-  wave2vec:
-    processor: "facebook/wav2vec2-base-960h"
-    model: "facebook/wav2vec2-base-960h"
-    device: "mps"
+  transcription:
+    wave_processor: "facebook/wav2vec2-base-960h"
+    wave_model: "facebook/wav2vec2-base-960h"
     
   whisper:
     model_size: "medium"
