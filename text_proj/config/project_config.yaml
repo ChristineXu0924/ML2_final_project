@@ -1,0 +1,30 @@
+data:
+  # raw_data_path: "s3://your-bucket/raw_data.csv"
+  processed_data_path: "../data/wave2vec_transcribed.csv"
+
+models:
+  wave2vec:
+    processor: "facebook/wav2vec2-base-960h"
+    model: "facebook/wav2vec2-base-960h"
+    device: "mps"
+    
+  whisper:
+    model_size: "medium"
+
+  ner_model: "en_core_web_sm"
+
+  summarization:
+    large: "facebook/bart-large-cnn"
+    small: "facebook/bart-large-cnn"
+    tiny: "google/pegasus-xsum"
+
+  translation:
+
+
+
+settings:
+  use_gpu: true
+  max_length_large: 300
+  min_length_large: 100
+  max_length_small: 100
+  min_length_small: 40
