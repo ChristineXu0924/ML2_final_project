@@ -10,6 +10,8 @@ import yaml
 import torch
 import soundfile as sf
 import librosa
+from src.translate import translate_to_chinese
+
 
 # Load configuration
 @st.cache_resource
@@ -123,6 +125,14 @@ if uploaded_file is not None:
         st.subheader("Tiny Summary")
         tiny = models["tiny_sum"](transcript)[0]["summary_text"]
         st.write(tiny)
+
+# Chinese Translation (at the end)
+st.subheader("Chinese Translation (via NLLB-200)")
+try:
+    translation = translate_to_chinese(transcript)
+    st.code(translation, language='zh')
+except Exception as e:
+    st.warning(f"Translation error: {e}")
 
     # Optional cleanup
     Path(tmp_path).unlink(missing_ok=True)
