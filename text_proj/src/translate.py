@@ -25,6 +25,10 @@ def translate_to_chinese(text, max_length=2024):
     if pd.isna(text) or not isinstance(text, str) or text.strip() == "":
         return ""
 
+    # Ensure the text ends with a period for proper sentence splitting
+    if not text.strip().endswith('.'):
+        text += '.'
+
     tokenizer.src_lang = src_lang
     sentences = [s.strip() for s in text.split('.') if s.strip()]
     translated_sentences = []
