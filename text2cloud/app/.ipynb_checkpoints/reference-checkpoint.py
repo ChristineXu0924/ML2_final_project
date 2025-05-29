@@ -42,7 +42,7 @@ def load_models():
             "model": model,
             "device": device
         },
-        "ner": spacy.load(config["models"]["ner_model"]),
+        "ner": spacy.load(str((Path(__file__).parent.parent / config["models"]["ner_model"]).resolve())),
         "sum": pipeline("summarization", model=config["models"]["summarization"]["sum_model"]),
         "whisper": whisper.load_model(config["models"]["transcription"]["whisper_model"])  
     }

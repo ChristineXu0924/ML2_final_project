@@ -6,16 +6,12 @@ models:
   transcription:
     wave_processor: "facebook/wav2vec2-base-960h"
     wave_model: "facebook/wav2vec2-base-960h"
-    
-  whisper:
-    model_size: "medium"
+    whisper_model: "medium"
 
-  ner_model: "en_core_web_sm"
+  ner_model: "ner_custom_model"
 
-  summarization:
-    large: "facebook/bart-large-cnn"
-    small: "facebook/bart-large-cnn"
-    tiny: "google/pegasus-xsum"
+  summarization: 
+    sum_model: "facebook/bart-large-cnn"
 
   translation:
     model: "facebook/nllb-200-1.3B"
@@ -23,11 +19,11 @@ models:
     tgt_lang: "zho_Hans"
 
 
-
-
 settings:
   use_gpu: true
   max_length_large: 300
   min_length_large: 100
   max_length_small: 100
-  min_length_small: 40
+  min_length_small: 50
+  max_length_tiny: 30
+  min_length_tiny: 10

@@ -8,7 +8,7 @@ models:
     wave_model: "facebook/wav2vec2-base-960h"
     whisper_model: "medium"
 
-  ner_model: "en_core_web_sm"
+  ner_model: "ner_custom_model"
 
   summarization: 
     sum_model: "facebook/bart-large-cnn"

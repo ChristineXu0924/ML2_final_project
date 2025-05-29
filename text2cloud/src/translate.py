@@ -34,7 +34,7 @@ def translate_to_chinese(text, max_length=2024):
     translated_sentences = []
 
     for sentence in sentences:
-        inputs = tokenizer(sentence, return_tensors="pt", truncation=True, padding=True, max_length=max_length)
+        inputs = tokenizer(sentence, return_tensors="pt", padding=True, truncation=True, max_length=max_length)
         outputs = model.generate(
             **inputs,
             forced_bos_token_id=tgt_token_id,
@@ -42,7 +42,8 @@ def translate_to_chinese(text, max_length=2024):
             num_beams=5,
             no_repeat_ngram_size=2
         )
-        translated = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        translated = tokenizer.decode(outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        translated = translated.rstrip("，,、。；;")
         translated_sentences.append(translated)
 
     return " ".join(translated_sentences)

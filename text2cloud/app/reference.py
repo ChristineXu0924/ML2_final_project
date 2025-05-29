@@ -1,5 +1,4 @@
 # streamlit_app.py
-# streamlit_app.py
 import streamlit as st
 import spacy
 from transformers import pipeline, Wav2Vec2Processor, Wav2Vec2ForCTC
@@ -10,15 +9,12 @@ import yaml
 import torch
 import soundfile as sf
 import librosa
+import whisper
 
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.translate import translate_to_chinese
-
-
-
-
 
 # Load configuration
 @st.cache_resource
@@ -46,13 +42,10 @@ def load_models():
             "model": model,
             "device": device
         },
-        "ner": spacy.load(config["models"]["ner_model"]),
-        "tiny_sum": pipeline("summarization", model=config["models"]["summarization"]["tiny"]),
-        "long_sum": pipeline("summarization", model=config["models"]["summarization"]["large"]),  
-        "short_sum": pipeline("summarization", model=config["models"]["summarization"]["small"])
+        "ner": spacy.load(str((Path(__file__).parent.parent / config["models"]["ner_model"]).resolve())),
+        "sum": pipeline("summarization", model=config["models"]["summarization"]["sum_model"]),
+        "whisper": whisper.load_model(config["models"]["transcription"]["whisper_model"])  
     }
-
-models = load_models()
 
 # Function to transcribe audio using Wav2Vec2
 def transcribe_audio(audio_path, models):
@@ -81,6 +74,39 @@ def transcribe_audio(audio_path, models):
     except Exception as e:
         return f"Error transcribing audio: {e}"
 
+
+# Function to transcribe audio using Whisper (if needed)
+def transcribe_audio_whisper(audio_path, models):
+    try:
+        result = models["whisper"].transcribe(audio_path)
+        return result["text"]
+    except Exception as e:
+        return f"Error transcribing audio with Whisper: {e}"
+
+models = load_models()
+
+# Add a sidebar with model recommendation info
+st.sidebar.title("Model Selection")
+st.sidebar.markdown("""
+### Transcription Model Recommendations:
+- **Whisper**: Produces text with proper punctuation and capitalization. Better for general use.
+- **Wav2Vec2**: Better performance on LibriSpeech-like audio but lacks punctuation and proper capitalization.
+""")
+
+# Select transcription method
+transcription_method = st.sidebar.selectbox(
+    "Choose transcription method",
+    ["Whisper", "Wav2Vec2"]
+)
+
+# Function to determine which transcription function to use
+def transcribe_audio_func(audio_path, models):
+    if transcription_method == "Wav2Vec2":
+        return transcribe_audio(audio_path, models)
+    else:
+        return transcribe_audio_whisper(audio_path, models)
+
+
 # App UI
 st.title("🎙️ Audio Summarizer and NER Extractor")
 uploaded_file = st.file_uploader("Upload an audio file (.wav or .flac)", type=["wav", "flac"])
@@ -91,8 +117,8 @@ if uploaded_file is not None:
         tmp_path = tmp_file.name
 
     st.audio(uploaded_file)
-    st.write("Transcribing with Wav2Vec2...")
-    transcript = transcribe_audio(tmp_path, models)
+    st.write("Transcribing with ", transcription_method, "...")
+    transcript = transcribe_audio_func(tmp_path, models)
 
     st.subheader("Transcript")
     st.write(transcript)
@@ -108,29 +134,35 @@ if uploaded_file is not None:
 
     # Summary
     if word_count < 42:
-        st.subheader("The audio is too short. Generate tiny summary")
+        st.subheader("The audio is too short. Generating tiny summary")
         try:
-            tiny = models["tiny_sum"](transcript)[0]["summary_text"]
+            tiny = models["sum"](transcript, 
+                            min_length=config["settings"]["min_length_tiny"], 
+                            max_length=config["settings"]["max_length_tiny"], 
+                            do_sample=False)[0]["summary_text"]
             st.write(tiny)
         except Exception as e:
             st.write(f"Error generating summary: {e}")
     else:
         st.subheader("Long Summary")
-        long = models["long_sum"](transcript, 
+        long = models["sum"](transcript, 
                                  min_length=config["settings"]["min_length_large"], 
                                  max_length=config["settings"]["max_length_large"], 
                                  do_sample=False)[0]["summary_text"]
         st.write(long)
 
         st.subheader("Short Summary")
-        short = models["short_sum"](transcript, 
+        short = models["sum"](transcript, 
                                    min_length=config["settings"]["min_length_small"], 
                                    max_length=config["settings"]["max_length_small"], 
                                    do_sample=False)[0]["summary_text"]
         st.write(short)
 
         st.subheader("Tiny Summary")
-        tiny = models["tiny_sum"](transcript)[0]["summary_text"]
+        tiny = models["sum"](transcript, 
+                                   min_length=config["settings"]["min_length_tiny"], 
+                                   max_length=config["settings"]["max_length_tiny"], 
+                                   do_sample=False)[0]["summary_text"]
         st.write(tiny)
 
     # Chinese Translation (via NLLB-200)
@@ -140,8 +172,6 @@ if uploaded_file is not None:
         st.code(translation, language='zh')
     except Exception as e:
         st.warning(f"Translation error: {e}")
-
-
 
     # Optional cleanup
     Path(tmp_path).unlink(missing_ok=True)
