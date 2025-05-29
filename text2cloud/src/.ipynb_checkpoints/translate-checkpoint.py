@@ -1,0 +1,44 @@
+import pandas as pd
+import yaml
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load config
+config_path = Path(__file__).parent.parent / "config" / "project_config.yaml"
+with open(config_path, "r") as f:
+    config = yaml.safe_load(f)
+
+# Load translation model parameters from config
+model_name = config["models"]["translation"]["model"]
+src_lang = config["models"]["translation"]["src_lang"]
+tgt_lang_code = config["models"]["translation"]["tgt_lang"]
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+# Get token ID for target language
+tgt_token_id = tokenizer.convert_tokens_to_ids(tgt_lang_code)
+
+# Translation function
+def translate_to_chinese(text, max_length=2024):
+    if pd.isna(text) or not isinstance(text, str) or text.strip() == "":
+        return ""
+
+    tokenizer.src_lang = src_lang
+    sentences = [s.strip() for s in text.split('.') if s.strip()]
+    translated_sentences = []
+
+    for sentence in sentences:
+        inputs = tokenizer(sentence, return_tensors="pt", truncation=True, padding=True, max_length=max_length)
+        outputs = model.generate(
+            **inputs,
+            forced_bos_token_id=tgt_token_id,
+            max_length=max_length,
+            num_beams=5,
+            no_repeat_ngram_size=2
+        )
+        translated = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        translated_sentences.append(translated)
+
+    return " ".join(translated_sentences)
