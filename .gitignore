@@ -1,0 +1,5 @@
+# Ignore all .env-style files anywhere in the repo
+*.env
+
+# OR be more specific to your case:
+text2cloud/config/secrets.env
