@@ -4,4 +4,4 @@
 # OR be more specific to your case:
 text2cloud/config/secrets.env
 
-.DS_Store
+.DS_Stores
