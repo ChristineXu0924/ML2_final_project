@@ -1,5 +1,7 @@
 """Streamlit app for audio transcription, summarization, NER, and translation."""
 
+from dotenv import load_dotenv
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -8,6 +10,7 @@ import streamlit as st
 import spacy
 import torch
 import whisper
+import boto3
 from transformers import pipeline, Wav2Vec2Processor, Wav2Vec2ForCTC
 
 # Ensure src folder is in path
@@ -16,6 +19,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.config import load_config
 from src.transcribe_clean import transcribe_wav2vec, transcribe_whisper
 from src.translate import translate_to_chinese
+
+# Load AWS environment variables
+env_path = Path("../config/secrets.env")
+load_dotenv(env_path)
 
 # Initialize session state
 if "model_locked" not in st.session_state:
@@ -30,6 +37,21 @@ def get_config():
     return load_config()
 
 config = get_config()
+
+# Access AWS S3 bucket and list testing audio files
+@st.cache_data
+def list_s3_audio(bucket, prefix):
+    s3 = boto3.client("s3")
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    return [obj["Key"] for obj in response.get("Contents", []) if obj["Key"].endswith((".flac", ".wav"))]
+
+@st.cache_data
+def download_from_s3(bucket, s3_key):
+    s3 = boto3.client("s3")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(s3_key).suffix)
+    s3.download_file(bucket, s3_key, tmp.name)
+    return tmp.name
+
 
 @st.cache_resource
 def load_models():
