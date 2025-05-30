@@ -1,6 +1,35 @@
-# Ignore all .env-style files anywhere in the repo
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+ENV/
+env/
+.textcloud_venv/
+.venv/
+*.venv
+
+# Streamlit cache
+.streamlit/
+
+# AWS credentials or env files
 *.env
-# OR be more specific to your case:
+.env*
 text2cloud/config/secrets.env
 
+# Mac system files
 .DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Large datasets
+LibriSpeech/
+data/
+
