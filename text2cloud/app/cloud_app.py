@@ -1,10 +1,10 @@
 """Streamlit app for audio transcription, summarization, NER, and translation."""
 
-from dotenv import load_dotenv
 import os
 import sys
 import tempfile
 from pathlib import Path
+from dotenv import load_dotenv
 
 import streamlit as st
 import spacy
@@ -17,14 +17,17 @@ from transformers import pipeline, Wav2Vec2Processor, Wav2Vec2ForCTC
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from src.config import load_config
-from src.transcribe_clean import transcribe_wav2vec, transcribe_whisper
+from src.transcribe import transcribe_wav2vec, transcribe_whisper
 from src.translate import translate_to_chinese
 
 # Load AWS environment variables
 env_path = Path("../config/secrets.env")
 load_dotenv(env_path)
 
-# Initialize session state
+BUCKET = os.getenv("BUCKET_NAME", "").strip()
+PREFIX = os.getenv("BUCKET_PREFIX", "").strip()
+
+# Initialize session statse
 if "model_locked" not in st.session_state:
     st.session_state.model_locked = False
 
@@ -41,12 +44,15 @@ config = get_config()
 # Access AWS S3 bucket and list testing audio files
 @st.cache_data
 def list_s3_audio(bucket, prefix):
+    """List audio files in S3 bucket."""
     s3 = boto3.client("s3")
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    return [obj["Key"] for obj in response.get("Contents", []) if obj["Key"].endswith((".flac", ".wav"))]
+    return [obj["Key"] for obj in response.get("Contents",
+                                            []) if obj["Key"].endswith((".flac", ".wav"))]
 
 @st.cache_data
 def download_from_s3(bucket, s3_key):
+    """Download a file from S3 to a temporary location."""
     s3 = boto3.client("s3")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(s3_key).suffix)
     s3.download_file(bucket, s3_key, tmp.name)
@@ -111,12 +117,14 @@ st.title("🎙️ Audio Summarizer and NER Extractor")
 if not st.session_state.selected_model:
     st.warning("Please select a transcription model from the sidebar before uploading audio.")
 else:
-    uploaded_file = st.file_uploader("Upload an audio file (.wav or .flac)", type=["wav", "flac"], disabled=not st.session_state.selected_model)
+    uploaded_file = st.file_uploader("Upload an audio file (.wav or .flac)",
+                        type=["wav", "flac"], disabled=not st.session_state.selected_model)
 
     if uploaded_file is not None:
         st.session_state.model_locked = True
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp_file:
+        with tempfile.NamedTemporaryFile(delete=False,
+                                        suffix=Path(uploaded_file.name).suffix) as tmp_file:
             tmp_file.write(uploaded_file.read())
             tmp_path = tmp_file.name
 
