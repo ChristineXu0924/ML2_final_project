@@ -14,7 +14,7 @@ import sys
 # BUCKET_NAME = os.getenv("BUCKET_NAME")
 # PREFIX_DATA = os.getenv("BUCKET_PREFIX_DATA")
 # PREFIX_MODEL = os.getenv("BUCKET_PREFIX_MODEL")
-s3 = boto3.client("s3")
+s3 = boto3.client("s3", region_name="us-east-1")
 
 def list_audio_files(bucket: str, prefix: str) -> list:
     """List .flac or .wav files under a prefix in S3"""
@@ -71,12 +71,13 @@ def load_ner_model_from_s3(bucket_name: str, prefix: str):
 #         print(f"{ent.text}: {ent.label_}")
 
 
-def trigger_lambda(bucket: str, key: str, lambda_function_name: str) -> dict:
+def trigger_lambda(bucket: str, key: str, model:str, lambda_function_name: str) -> dict:
     """Trigger a Lambda function with an S3 file path."""
     lambda_client = boto3.client("lambda")
     payload = {
         "bucket": bucket,
-        "key": key
+        "key": key,
+        "model": model
     }
     response = lambda_client.invoke(
         FunctionName=lambda_function_name,

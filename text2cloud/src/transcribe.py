@@ -1,12 +1,14 @@
 """Audio transcription module using Wav2Vec2 and Whisper models."""
 
 import torch
-import soundfile as sf
-import librosa
+import torchaudio
 
-def transcribe_wav2vec(audio_path: str, processor, model, device) -> str:
+
+def transcribe_wav2vec(
+    audio_path: str, processor, model, device
+) -> str:
     """
-    Transcribe audio using Wav2Vec2 model.
+    Transcribe audio using Wav2Vec2 model with torchaudio.
 
     Args:
         audio_path (str): Path to the audio file.
@@ -15,16 +17,19 @@ def transcribe_wav2vec(audio_path: str, processor, model, device) -> str:
         device: Device (CPU or GPU).
     """
     try:
-        speech_array, sampling_rate = sf.read(audio_path)
+        import torchaudio
+
+        waveform, sample_rate = torchaudio.load(audio_path)
 
         # Resample if needed
-        if sampling_rate != 16000:
-            speech_array = librosa.resample(
-                speech_array, orig_sr=sampling_rate, target_sr=16000
+        if sample_rate != 16000:
+            resampler = torchaudio.transforms.Resample(
+                orig_freq=sample_rate, new_freq=16000
             )
+            waveform = resampler(waveform)
 
         input_values = processor(
-            speech_array, return_tensors="pt", sampling_rate=16000
+            waveform.squeeze().numpy(), return_tensors="pt", sampling_rate=16000
         ).input_values.to(device)
 
         with torch.no_grad():
@@ -34,7 +39,8 @@ def transcribe_wav2vec(audio_path: str, processor, model, device) -> str:
         return processor.decode(predicted_ids[0])
 
     except Exception as err:
-        return f"Error in Wav2Vec2 transcription: {err}"
+        return f"Error in Wav2Vec2 transcription with torchaudio: {err}"
+    
 
 def transcribe_whisper(audio_path: str, model) -> str:
     """

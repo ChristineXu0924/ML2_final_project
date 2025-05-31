@@ -1,14 +1,21 @@
 import sys
+import os
+import tempfile
 print("LOADED MODULES:", sys.modules.keys())
 
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import whisper
-from .transcribe import transcribe_whisper, transcribe_wav2vec
+from transcribe import transcribe_whisper, transcribe_wav2vec
 import tempfile
 import boto3
 from pathlib import Path
 
-s3 = boto3.client("s3")
+print("Lambda handler loaded successfully.")
+
+s3 = boto3.client("s3", region_name="us-east-1")
+os.environ["XDG_CACHE_HOME"] = "/tmp"
+os.environ["TRANSFORMERS_CACHE"] = "/tmp"
+os.environ["HF_HOME"] = "/tmp"
 
 def lambda_handler(event: dict, context: dict) -> dict:
     """
@@ -32,11 +39,11 @@ def lambda_handler(event: dict, context: dict) -> dict:
 
     # Transcribe based on selected model
     if model_choice == "Wav2Vec2":
-        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-        model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").to("cpu")
+        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h", cache_dir="/tmp")
+        model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h", cache_dir="/tmp").to("cpu")
         transcript = transcribe_wav2vec(tmp_audio.name, processor, model, device="cpu")
     else:
-        model = whisper.load_model("base")
+        model = whisper.load_model("base", download_root="/tmp")
         transcript = transcribe_whisper(tmp_audio.name, model)
 
     return {

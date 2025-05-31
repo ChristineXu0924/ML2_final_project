@@ -20,7 +20,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.config import load_config
 from src.transcribe import transcribe_wav2vec, transcribe_whisper
 from src.translate import translate_to_chinese
-from src.s3_utils import list_audio_files, load_ner_model_from_s3, trigger_lambda
+from src.s3_utils import list_audio_files, load_ner_model_from_s3, trigger_lambda, upload_file
 
 
 # Load AWS environment variables
@@ -31,7 +31,7 @@ BUCKET = os.getenv("BUCKET_NAME").strip()
 PREFIX_DATA = os.getenv("BUCKET_PREFIX_DATA").strip()
 PREFIX_MODEL = os.getenv("BUCKET_PREFIX_MODEL").strip()
 LAMBDA_FUNC = os.getenv("LAMBDA_FUNCTION_NAME").strip()
-s3 = boto3.client("s3")
+s3 = boto3.client("s3", region_name="us-east-1")
 
 # Initialize session statse
 if "model_locked" not in st.session_state:
@@ -106,7 +106,7 @@ if st.sidebar.button("🔄 Reset Model Selection"):
     st.rerun()
 
 # App title
-st.title("🎙️ Audio Summarizer and NER Extractor")
+st.title("🎙️ Speech-to-Text and Audio Insights via AWS Lambda, S3 & ECS")
 
 # Block until model is selected
 if not st.session_state.selected_model:
@@ -114,7 +114,6 @@ if not st.session_state.selected_model:
 else:
     st.session_state.model_locked = True
 
-    # Part 1: Let user choose input method
     input_method = st.radio("Choose input method", ["Upload Audio File", "Select Test File from S3"])
 
     uploaded_file = None
@@ -127,6 +126,8 @@ else:
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp_file:
                 tmp_file.write(uploaded_file.read())
                 tmp_path = tmp_file.name
+            s3_key = f"streamlit_inputs/{Path(tmp_path).name}"
+            s3.upload_file(tmp_path, BUCKET, s3_key)
             st.audio(uploaded_file)
 
     elif input_method == "Select Test File from S3":
@@ -135,29 +136,23 @@ else:
         selected_file = st.selectbox("Select a test file", test_files)
         if selected_file:
             tmp_path = download_from_s3(BUCKET, selected_file)
+            s3_key = selected_file
             st.audio(tmp_path)
     
     # Part 2: Transcribe audio, generate summaries, NER, and translation
     if tmp_path:
-        st.write("Transcribing with", st.session_state.selected_model, "...")
+        st.write("Invoking Lambda and transcribing with ", st.session_state.selected_model, "...")
         
-        def transcribe_audio_func(audio_path, models_dict):
-            """Transcribe audio using selected method."""
-            method = st.session_state.selected_model
-            if method == "Wav2Vec2":
-                processor = models_dict["wav2vec"]["processor"]
-                model = models_dict["wav2vec"]["model"]
-                device = models_dict["wav2vec"]["device"]
-                return transcribe_wav2vec(audio_path, processor, model, device)
-            return transcribe_whisper(audio_path, models_dict["whisper"])
-
-        transcript = transcribe_audio_func(tmp_path, models)
+        lambda_response = trigger_lambda(BUCKET, s3_key, st.session_state.selected_model, LAMBDA_FUNC)
+        st.write("Lambda response:", lambda_response)
+        transcript = lambda_response.get("transcript", "")
 
         st.subheader("Transcript")
         st.write(transcript)
 
         st.subheader("Named Entities")
 
+        # Load NER model from S3
         cloud_ner_model, temp_dir = load_ner_model_from_s3(BUCKET, PREFIX_MODEL)
         doc = cloud_ner_model(transcript)
 
