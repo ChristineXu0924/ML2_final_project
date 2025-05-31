@@ -1,17 +1,9 @@
-transformers>=4.35.0
-# Use CPU-only versions of PyTorch packages to reduce size and build complexity
+torch==2.1.2+cpu
+torchaudio==2.1.2+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.0.1
-torchaudio==2.0.2
-# Core dependencies
-boto3
-soundfile>=0.12.1
-# Whisper with more specific version to avoid dependency issues
-openai-whisper==20231117
-tiktoken
 
 transformers
-torchaudio
-torch
 boto3
-whisper
+numba==0.57.1
+git+https://github.com/openai/whisper.git@v20231117
+tiktoken
