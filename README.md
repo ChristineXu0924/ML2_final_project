@@ -12,9 +12,12 @@ Audio data is abundant across domains like customer support, healthcare, media, 
 ## Unit test 
 How to run the Unit tests in Docker:
 
-Build docker img: 
 ```bash
 cd text2cloud
+```
+
+Build docker img: 
+```bash
 docker build -t cloud2text .
 ```
 Run the test:
