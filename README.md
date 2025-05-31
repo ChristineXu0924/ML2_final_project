@@ -24,3 +24,22 @@ Run the test:
 ```bash
 docker run -e PYTHONPATH=/app cloud2text pytest -s tests/test_pipeline.py
 ```
+
+## Local run streamlit
+
+
+
+```bash
+cd text2cloud
+```
+
+Build docker img: 
+```bash
+docker build -t cloud2text .
+```
+Run the test:
+```bash
+ docker run -p 8501:8501 cloud2text streamlit run app/cloud_app.py
+```
+
+
