@@ -14,6 +14,7 @@ How to run the Unit tests in Docker:
 
 Build docker img: 
 ```bash
+cd text2cloud
 docker build -t cloud2text .
 ```
 Run the test:
