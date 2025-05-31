@@ -12,6 +12,7 @@ import torch
 import whisper
 import boto3
 from transformers import pipeline, Wav2Vec2Processor, Wav2Vec2ForCTC
+import random
 
 # Ensure src folder is in path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -19,13 +20,18 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from src.config import load_config
 from src.transcribe import transcribe_wav2vec, transcribe_whisper
 from src.translate import translate_to_chinese
+from src.s3_utils import list_audio_files, load_ner_model_from_s3, trigger_lambda
+
 
 # Load AWS environment variables
-env_path = Path("../config/secrets.env")
-load_dotenv(env_path)
+env_path = Path(__file__).resolve().parent.parent / "config" / "secrets.env"
+load_dotenv(dotenv_path=env_path)
 
-BUCKET = os.getenv("BUCKET_NAME", "").strip()
-PREFIX = os.getenv("BUCKET_PREFIX", "").strip()
+BUCKET = os.getenv("BUCKET_NAME").strip()
+PREFIX_DATA = os.getenv("BUCKET_PREFIX_DATA").strip()
+PREFIX_MODEL = os.getenv("BUCKET_PREFIX_MODEL").strip()
+LAMBDA_FUNC = os.getenv("LAMBDA_FUNCTION_NAME").strip()
+s3 = boto3.client("s3")
 
 # Initialize session statse
 if "model_locked" not in st.session_state:
@@ -41,23 +47,12 @@ def get_config():
 
 config = get_config()
 
-# Access AWS S3 bucket and list testing audio files
-@st.cache_data
-def list_s3_audio(bucket, prefix):
-    """List audio files in S3 bucket."""
-    s3 = boto3.client("s3")
-    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    return [obj["Key"] for obj in response.get("Contents",
-                                            []) if obj["Key"].endswith((".flac", ".wav"))]
-
 @st.cache_data
 def download_from_s3(bucket, s3_key):
     """Download a file from S3 to a temporary location."""
-    s3 = boto3.client("s3")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(s3_key).suffix)
     s3.download_file(bucket, s3_key, tmp.name)
     return tmp.name
-
 
 @st.cache_resource
 def load_models():
@@ -117,18 +112,33 @@ st.title("🎙️ Audio Summarizer and NER Extractor")
 if not st.session_state.selected_model:
     st.warning("Please select a transcription model from the sidebar before uploading audio.")
 else:
-    uploaded_file = st.file_uploader("Upload an audio file (.wav or .flac)",
-                        type=["wav", "flac"], disabled=not st.session_state.selected_model)
+    st.session_state.model_locked = True
 
-    if uploaded_file is not None:
-        st.session_state.model_locked = True
+    # Part 1: Let user choose input method
+    input_method = st.radio("Choose input method", ["Upload Audio File", "Select Test File from S3"])
 
-        with tempfile.NamedTemporaryFile(delete=False,
-                                        suffix=Path(uploaded_file.name).suffix) as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            tmp_path = tmp_file.name
+    uploaded_file = None
+    selected_file = None
+    tmp_path = None
 
-        st.audio(uploaded_file)
+    if input_method == "Upload Audio File":
+        uploaded_file = st.file_uploader("Upload a .wav or .flac audio file", type=["wav", "flac"])
+        if uploaded_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp_file:
+                tmp_file.write(uploaded_file.read())
+                tmp_path = tmp_file.name
+            st.audio(uploaded_file)
+
+    elif input_method == "Select Test File from S3":
+        test_files = list_audio_files(BUCKET, PREFIX_DATA)
+        test_files = random.sample(test_files, 10)  # Randomly select 5 files
+        selected_file = st.selectbox("Select a test file", test_files)
+        if selected_file:
+            tmp_path = download_from_s3(BUCKET, selected_file)
+            st.audio(tmp_path)
+    
+    # Part 2: Transcribe audio, generate summaries, NER, and translation
+    if tmp_path:
         st.write("Transcribing with", st.session_state.selected_model, "...")
         
         def transcribe_audio_func(audio_path, models_dict):
@@ -147,7 +157,10 @@ else:
         st.write(transcript)
 
         st.subheader("Named Entities")
-        doc = models["ner"](transcript)
+
+        cloud_ner_model, temp_dir = load_ner_model_from_s3(BUCKET, PREFIX_MODEL)
+        doc = cloud_ner_model(transcript)
+
         entities = [(ent.text, ent.label_) for ent in doc.ents]
         st.write(entities if entities else "No named entities found.")
 
